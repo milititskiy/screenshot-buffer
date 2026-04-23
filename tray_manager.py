@@ -96,6 +96,7 @@ class TrayManager(QObject):
         core.status_changed_signal.connect(self._on_status)
         core.log_added_signal.connect(self._on_log)
         core.send_result_signal.connect(self._on_send_result)
+        core.screenshot_received_signal.connect(self._on_received)
 
     # ------------------------------------------------------------------
     # Icon (drawn programmatically — no file dependency)
@@ -226,6 +227,19 @@ class TrayManager(QObject):
     def _on_log(self, entry: str) -> None:
         if self._log_win is not None and self._log_win.isVisible():
             self._log_win.append(entry)
+
+    def _on_received(self, metadata: object, _image_data: object) -> None:
+        sender = "unknown"
+        if isinstance(metadata, dict):
+            sender = metadata.get("sender_name", sender)
+        paste_key = "Cmd+V" if sys.platform == "darwin" else "Ctrl+V"
+        if self._tray.supportsMessages():
+            self._tray.showMessage(
+                "Screenshot received",
+                f"From {sender} — ready to paste ({paste_key})",
+                QSystemTrayIcon.MessageIcon.Information,
+                3000,
+            )
 
     def _on_send_result(self, success: bool, msg: str) -> None:
         if self._tray.supportsMessages():
