@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  entitlements.plist — Code-signing entitlements for macOS Sequoia (15.x)
+
+  These are applied during:
+    codesign --entitlements entitlements.plist ...
+
+  For an ad-hoc signed / unsigned app, macOS still reads Info.plist for
+  privacy strings, but entitlements only matter for Developer-ID or
+  App-Store signed builds.
+
+  For LOCAL DEVELOPMENT (ad-hoc sign):
+    - The app is NOT sandboxed, so it can access the network and screen
+      without sandbox-specific entitlements.
+    - Screen Recording and Accessibility are granted via System Preferences,
+      not via entitlements.
+
+  For DISTRIBUTION (Developer ID signed):
+    - Keep com.apple.security.cs.* entries below.
+    - Do NOT add com.apple.security.app-sandbox=true — the app uses raw TCP
+      sockets and global hotkeys which are incompatible with the sandbox.
+-->
+<dict>
+
+    <!-- Allow PyInstaller's Python runtime (unsigned code pages) -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!-- Allow loading third-party dylibs (PySide6, PyObjC, etc.) -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+    <!-- Allow JIT — needed by some PySide6 / Qt internal components -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!--
+      Do NOT add com.apple.security.app-sandbox here.
+      Sandboxed apps cannot:
+        - bind to arbitrary TCP ports  (receiver)
+        - register global hotkeys via CGEventTap  (pynput)
+    -->
+
+</dict>
+</plist>

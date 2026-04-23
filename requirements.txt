@@ -1,0 +1,18 @@
+# ── Core UI & runtime ─────────────────────────────────────────────────
+PySide6>=6.5.0
+
+# ── Screen capture ────────────────────────────────────────────────────
+mss>=9.0.0
+Pillow>=10.0.0
+
+# ── Global hotkeys ────────────────────────────────────────────────────
+pynput>=1.7.6
+
+# ── Windows: native clipboard (CF_DIB + PNG format) ──────────────────
+pywin32>=305; sys_platform == "win32"
+
+# ── macOS: NSPasteboard clipboard + Dock hiding ───────────────────────
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
+
+# ── Packaging (install separately, not needed at runtime) ─────────────
+# pyinstaller>=6.0

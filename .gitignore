@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Build outputs
+build/
+dist/
+*.spec.bak
+
+# PyInstaller
+*.spec.log
+
+# macOS
+.DS_Store
+*.iconset/
+
+# Logs
+*.log
+stderr.log
+stdout.log
+
+# Settings (user-specific, not committed)
+# ~/.screenshot_buffer/ is outside repo anyway

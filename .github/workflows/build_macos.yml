@@ -1,0 +1,135 @@
+name: Build macOS App
+
+on:
+  push:
+    branches: [main, master]
+    tags:     ['v*']
+  workflow_dispatch:          # allow manual trigger from GitHub UI
+
+jobs:
+  build-macos:
+    name: Build ScreenshotBuffer.app
+    runs-on: macos-15          # macOS Sequoia (15.x)
+    timeout-minutes: 30
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Python ────────────────────────────────────────────────────
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # ── Dependencies ──────────────────────────────────────────────
+      - name: Install runtime dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements_macos.txt
+
+      - name: Install PyInstaller
+        run: pip install "pyinstaller>=6.6.0"
+
+      # ── Icon ──────────────────────────────────────────────────────
+      - name: Generate icon assets
+        run: python create_icon.py
+
+      # ── Build .app ────────────────────────────────────────────────
+      - name: Build .app bundle with PyInstaller
+        run: |
+          pyinstaller ScreenshotBuffer_macos.spec --noconfirm
+          echo "Build complete — listing dist/:"
+          ls -lh dist/
+
+      # ── Verify LSUIElement ────────────────────────────────────────
+      - name: Verify Info.plist (LSUIElement = true)
+        run: |
+          PLIST="dist/ScreenshotBuffer.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :LSUIElement" "$PLIST"
+          echo "LSUIElement confirmed ✓"
+
+      # ── Ad-hoc code sign (no Apple Developer cert needed) ─────────
+      - name: Ad-hoc code sign
+        run: |
+          codesign \
+            --deep \
+            --force \
+            --options runtime \
+            --entitlements entitlements.plist \
+            --sign - \
+            dist/ScreenshotBuffer.app
+          codesign --verify --deep --strict dist/ScreenshotBuffer.app
+          echo "Ad-hoc signed ✓"
+
+      # ── Build DMG installer ───────────────────────────────────────
+      - name: Create DMG installer
+        run: |
+          # Create a nice DMG with an Applications symlink
+          mkdir -p dist/dmg_staging
+          cp -r dist/ScreenshotBuffer.app dist/dmg_staging/
+          ln -s /Applications dist/dmg_staging/Applications
+
+          hdiutil create \
+            -volname "Screenshot Buffer" \
+            -srcfolder dist/dmg_staging \
+            -ov \
+            -format UDZO \
+            -imagekey zlib-level=9 \
+            dist/ScreenshotBuffer.dmg
+
+          ls -lh dist/ScreenshotBuffer.dmg
+          echo "DMG created ✓"
+
+      # ── Smoke test: app binary exists and is executable ───────────
+      - name: Smoke test
+        run: |
+          BIN="dist/ScreenshotBuffer.app/Contents/MacOS/ScreenshotBuffer"
+          test -x "$BIN" && echo "Binary is executable ✓"
+          file "$BIN"
+
+      # ── Upload artifacts ──────────────────────────────────────────
+      - name: Upload .app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScreenshotBuffer-macos-app
+          path: dist/ScreenshotBuffer.app
+          retention-days: 30
+
+      - name: Upload DMG installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScreenshotBuffer-macos-dmg
+          path: dist/ScreenshotBuffer.dmg
+          retention-days: 30
+
+      # ── Create GitHub Release on version tag ──────────────────────
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/ScreenshotBuffer.dmg
+          name: Screenshot Buffer ${{ github.ref_name }}
+          body: |
+            ## Screenshot Buffer ${{ github.ref_name }}
+
+            ### Install on macOS Sequoia
+
+            1. Download **ScreenshotBuffer.dmg**
+            2. Open the DMG → drag **ScreenshotBuffer** to **Applications**
+            3. Right-click the app → **Open** (first launch only — bypasses Gatekeeper)
+            4. Grant permissions when prompted:
+               - **Accessibility** → System Settings → Privacy & Security → Accessibility
+               - **Screen Recording** → System Settings → Privacy & Security → Screen Recording
+            5. Quit and reopen the app
+            6. Blue camera icon appears in the menu bar
+
+            ### Usage
+            - **Send screenshot**: `Ctrl+Shift+S` (configurable)
+            - **Receive**: image lands in clipboard automatically → `Cmd+V`
+            - Right-click the menu-bar icon to configure IP, port, shortcut
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
